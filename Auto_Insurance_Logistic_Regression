@@ -1,0 +1,628 @@
+libname LogData '/sscc/home/j/jgv713/PREDICT411_Insurance_LogisticReg/';
+proc contents data=logdata.logit_insurance;run;
+*8161 records to keep track of;
+proc print data=logdata.logit_insurance (obs=10);run;
+
+*EXPLORATORY DATA ANALYSIS;
+proc freq data=logdata.logit_insurance;
+tables car_type*Target_Flag car_use*Target_Flag CLM_FREQ*Target_Flag Education*Target_Flag HOMEKIDS*Target_Flag job*Target_Flag KIDSDRIV*Target_Flag mstatus*Target_Flag mvr_pts*Target_Flag parent1*Target_Flag red_car*Target_Flag revoked*Target_Flag sex*Target_Flag TIF*Target_Flag urbanicity*Target_Flag/nocol nopercent norow;run;
+proc means data=logdata.logit_insurance min max mean median N NMiss stddev;
+Var Age Bluebook Car_age CLM_freq HomeKids Home_Val Income KidsDriv MVR_PTS OLDCLAIM TARGET_AMT TARGET_FLAG TIF TRAVTIME YOJ;
+run;
+proc freq data=logdata.logit_insurance;
+tables JOB;
+run: quit;
+*Box plots grouped by Target_Flag;
+proc sgplot data=logdata.logit_insurance;
+vbox Age / group=target_flag; run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox car_age / group=target_flag; run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox Bluebook/ group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox CLM_freq/ group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox HomeKids/ group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox Home_Val / group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox Income / group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox KidsDriv  / group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox MVR_PTS/ group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox OLDCLAIM  / group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox TIF / group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox TRAVTIME  / group=target_flag;run;
+
+proc sgplot data=logdata.logit_insurance;
+vbox YOJ/ group=target_flag;run;
+
+*Scatterplots of variable with Target_AMT;
+proc sgplot data=logdata.logit_insurance;
+scatter x=car_age y=target_amt; run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=Age y=target_amt; run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=Bluebook y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=CLM_freq y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=HomeKids y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=Home_Val y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=Income y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=KidsDriv y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=MVR_PTS y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=OLDCLAIM y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=TIF y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=TRAVTIME y=target_amt;run;
+
+proc sgplot data=logdata.logit_insurance;
+scatter x=YOJ y=target_amt;run;
+
+*Data preparation.  Fixing missing values by imputing the averages.  Also, creating a flag variable for the missing values;
+Data Logit;
+   set logdata.logit_insurance;
+
+   IMP_Age=Age;
+   M_Age=0;
+   if missing (Age) then do;
+   IMP_Age=44.8;
+   M_Age=1;
+   end;
+   drop Age;
+
+   IMP_Car_Age=Car_Age;
+   M_Car_Age=0;
+   if missing (Car_Age) then do;
+   IMP_Car_Age=8.3;
+   M_Car_Age=1;
+   end;
+   drop Car_Age;
+
+   IMP_Home_Val=Home_Val;
+   M_Home_Val=0;
+   if missing (Home_Val) then do;
+   IMP_Home_Val=154867.3;
+   M_Home_Val=1;
+   end;
+   drop Home_Val;
+
+   IMP_Income=Income;
+   M_Income=0;
+   if missing (Income) then do;
+   IMP_Income=61898;
+   M_Income=1;
+   end;
+   drop Income;
+
+   IMP_YOJ=YOJ;
+   M_YOJ=0;
+   if missing (YOJ) then do;
+   IMP_YOJ=10.5;
+   M_YOJ=1;
+   end;
+   drop YOJ;
+
+   if job = "." or job = " " then job = "z_Blue Collar";
+
+*Create Variable;
+	CLM_MVR=CLM_FREQ*MVR_PTS;
+	if (EDUCATION='Masters') or (EDUCATION='PhD') or (EDUCATION='Bachelors') then Bachelors_degree=1;
+	else Bachelors_degree=0;
+	drop education;
+run; quit;
+
+proc freq data=Logit;
+tables Bachelors_degree*Target_Flag;
+run;
+
+proc freq data=Logit;
+tables CLM_MVR*Target_Flag/nocol nopercent norow;Run;
+
+*Transforming data
+Macro for Trimming data;
+proc means data=Logit noprint;
+output out =MEANFILE
+	p1(IMP_Age IMP_Car_Age BLUEBOOK clm_freq IMP_Home_VAL IMP_Income OLDCLAIM)=p01AGE p01CAGE p01B p01cf p01HV p01I p01O
+	p5(IMP_AGE IMP_Car_Age BLUEBOOK clm_freq IMP_HOME_VAL IMP_Income OLDCLAIM)=p05AGE p05CAGE p05B p05cf p05HV p05I p05O
+	p95(IMP_AGE IMP_Car_Age BLUEBOOK clm_freq IMP_HOME_VAL IMP_Income OLDCLAIM)=p95AGE p95CAGE p95B p95cf p95HV p95I p95O
+	p99(IMP_AGE IMP_Car_Age BLUEBOOK clm_freq IMP_HOME_VAL IMP_Income OLDCLAIM)=p99AGE p99CAGE p99B p99cf p99HV p99I p99O;
+proc print data=MEANFILE;
+run;
+
+data;
+set MEANFILE;
+call symput("P01AGE",P01AGE);
+call symput("P05AGE",P05AGE);
+call symput("p95AGE",P95AGE);
+call symput("p99AGE",P99AGE);
+call symput("P01CAGE",P01CAGE);
+call symput("P05CAGE",P05CAGE);
+call symput("p95CAGE",P95CAGE);
+call symput("p99CAGE",P99CAGE);
+call symput("P01B",P01B);
+call symput("P05B",P05B);
+call symput("p95B",P95B);
+call symput("p99B",P99B);
+call symput("P01cf",P01cf);
+call symput("P05cf",P05cf);
+call symput("p95cf",P95cf);
+call symput("p99cf",P99cf);
+call symput("P01hv",P01hv);
+call symput("P05hv",P05hv);
+call symput("p95hv",P95hv);
+call symput("p99hv",P99hv);
+call symput("P01I",P01I);
+call symput("P05I",P05I);
+call symput("p95I",P95I);
+call symput("p99I",P99I);
+call symput("P01O",P01O);
+call symput("P05O",P05O);
+call symput("p95O",P95O);
+call symput("p99O",P99O);
+run; quit;
+
+data xform;
+set Logit;
+T95_AGE	=max(min(IMP_AGE,&P95AGE.),&p05AGE.);
+T99_AGE	=max(min(IMP_AGE,&P99AGE.),&p01AGE.);
+T95_CAGE	=max(min(IMP_CAR_AGE,&P95CAGE.),&p05CAGE.);
+T99_CAGE	=max(min(IMP_CAR_AGE,&P99CAGE.),&p01CAGE.);
+T95_B	=max(min(BLUEBOOK,&P95B.),&p05B.);
+T99_B	=max(min(BLUEBOOK,&P99B.),&p01B.);
+T95_cf	=max(min(clm_freq,&P95cf.),&p05cf.);
+T99_cf	=max(min(clm_freq,&P99cf.),&p01cf.);
+T95_hv	=max(min(IMP_HOME_VAL,&P95hv.),&p05hv.);
+T99_hv	=max(min(IMP_HOME_VAL,&P99hv.),&p01hv.);
+T95_I	=max(min(IMP_Income,&P95I.),&p05I.);
+T99_I	=max(min(IMP_Income,&P99I.),&p01I.);
+T95_O	=max(min(OLDCLAIM,&P95O.),&p05O.);
+T99_O	=max(min(OLDCLAIM,&P99O.),&p01O.);
+run;
+
+*Building Models using variable selection.
+Backward selection;
+proc logistic data=xform outmodel=insmodel plots(only)=roc;
+   class car_type (param=ref) car_use (param=ref) job (param=ref)
+     mstatus (param=ref) parent1 (param=ref) red_car (param=ref) urbanicity (param=ref);
+   model target_flag(event='1')=car_type car_use job mstatus parent1 red_car urbanicity
+     T99_AGE T95_B T99_CAGE T95_cf homekids T95_hv T95_I kidsdriv mvr_pts T95_O tif Bachelors_degree
+     travtime IMP_yoj
+       / selection=backward sls=.1 include=0 link=logit  ;
+   output out=pred p=phat  ;
+run;
+
+*KS Statistic for backward selection model;
+proc rank data=pred out=training_scores descending groups=10;
+var phat;
+ranks score_decile;
+run;
+
+proc means data=training_scores sum;
+class score_decile;
+var target_flag;
+output out=pm_out sum(target_flag)=Y_Sum;
+run;
+
+proc print data=pm_out; run;
+
+data lift_chart;
+	set pm_out (where=(_type_=1));
+	by _type_;
+	Nobs=_freq_;
+	score_decile = score_decile+1;
+
+	if first._type_ then do;
+		cum_obs=Nobs;
+		model_pred=Y_Sum;
+	end;
+	else do;
+		cum_obs=cum_obs+Nobs;
+		model_pred=model_pred+Y_Sum;
+	end;
+	retain cum_obs model_pred;
+
+	* 2148 represents the number of successes;
+	* This value will need to be changed with different samples;
+	pred_rate=model_pred/2148;
+	base_rate=score_decile*0.1;
+	lift = pred_rate-base_rate;
+
+	drop _freq_ _type_ ;
+run;
+
+proc print data=lift_chart; run;
+
+ods graphics on;
+title 'Your Lift Chart';
+symbol1 color=red interpol=join value=dot height=1;
+symbol2 color=black interpol=join value=dot height=1;
+proc gplot data=lift_chart;
+plot pred_rate*base_rate base_rate*base_rate /overlay ;
+run; quit;
+ods graphics off;
+
+*Forward selection;
+proc logistic data=xform outmodel=insmodel2 plots(only)=roc;
+   class car_type (param=ref) car_use (param=ref) job (param=ref)
+     mstatus (param=ref) parent1 (param=ref) red_car (param=ref) urbanicity (param=ref);
+   model target_flag(event='1')=car_type car_use job mstatus parent1 red_car urbanicity
+     T99_AGE T95_B T99_CAGE T95_cf homekids T95_hv T95_I kidsdriv mvr_pts T95_O tif Bachelors_degree
+     travtime IMP_yoj
+       / selection=forward sle=.1 include=0 link=logit  ;
+   output out=pred2 p=phat  ;
+run;
+
+*KS Statistic  for forward selection;
+proc rank data=pred2 out=training_scores2 descending groups=10;
+var phat;
+ranks score_decile;
+run;
+
+proc means data=training_scores2 sum;
+class score_decile;
+var target_flag;
+output out=pm_out2 sum(target_flag)=Y_Sum;
+run;
+
+proc print data=pm_out2; run;
+
+data lift_chart2;
+	set pm_out2 (where=(_type_=1));
+	by _type_;
+	Nobs=_freq_;
+	score_decile = score_decile+1;
+
+	if first._type_ then do;
+		cum_obs=Nobs;
+		model_pred=Y_Sum;
+	end;
+	else do;
+		cum_obs=cum_obs+Nobs;
+		model_pred=model_pred+Y_Sum;
+	end;
+	retain cum_obs model_pred;
+
+	* 2148 represents the number of successes;
+	* This value will need to be changed with different samples;
+	pred_rate=model_pred/2148;
+	base_rate=score_decile*0.1;
+	lift = pred_rate-base_rate;
+
+	drop _freq_ _type_ ;
+run;
+
+proc print data=lift_chart2; run;
+
+ods graphics on;
+title 'Your Lift Chart';
+symbol1 color=red interpol=join value=dot height=1;
+symbol2 color=black interpol=join value=dot height=1;
+proc gplot data=lift_chart2;
+plot pred_rate*base_rate base_rate*base_rate /overlay ;
+run; quit;
+ods graphics off;
+
+*Stepwise selection;
+proc logistic data=xform outmodel=insmodel3 plots(only)=roc;
+   class car_type (param=ref) car_use (param=ref) job (param=ref)
+     mstatus (param=ref) parent1 (param=ref) red_car (param=ref) urbanicity (param=ref);
+   model target_flag(event='1')=car_type car_use job mstatus parent1 red_car urbanicity
+     T99_AGE T95_B T99_CAGE T95_cf homekids T95_hv T95_I kidsdriv mvr_pts T95_O tif Bachelors_degree
+     travtime IMP_yoj
+       / selection=forward sle=.1 sls=.1 include=0 link=logit  ;
+   output out=pred3 p=phat  ;
+run;
+
+*KS Statistic for Stepwise Selection;
+proc rank data=pred3 out=training_scores3 descending groups=10;
+var phat;
+ranks score_decile;
+run;
+
+proc means data=training_scores3 sum;
+class score_decile;
+var target_flag;
+output out=pm_out3 sum(target_flag)=Y_Sum;
+run;
+
+proc print data=pm_out3; run;
+
+data lift_chart3;
+	set pm_out (where=(_type_=1));
+	by _type_;
+	Nobs=_freq_;
+	score_decile = score_decile+1;
+
+	if first._type_ then do;
+		cum_obs=Nobs;
+		model_pred=Y_Sum;
+	end;
+	else do;
+		cum_obs=cum_obs+Nobs;
+		model_pred=model_pred+Y_Sum;
+	end;
+	retain cum_obs model_pred;
+
+	* 2148 represents the number of successes;
+	* This value will need to be changed with different samples;
+	pred_rate=model_pred/2148;
+	base_rate=score_decile*0.1;
+	lift = pred_rate-base_rate;
+
+	drop _freq_ _type_ ;
+run;
+
+proc print data=lift_chart3; run;
+
+ods graphics on;
+title 'Your Lift Chart';
+symbol1 color=red interpol=join value=dot height=1;
+symbol2 color=black interpol=join value=dot height=1;
+proc gplot data=lift_chart3;
+plot pred_rate*base_rate base_rate*base_rate /overlay ;
+run; quit;
+ods graphics off;
+
+
+*verifying no records are missing;
+proc contents data=xform;
+run;quit;
+
+*DATA STEP FOR EXPECTED LOSSED FOLLOWING A CRASH;
+Data crash;
+	set Logit;
+	if Target_Amt>0;
+	run;quit;
+
+proc means data=crash mean;
+var Target_AMT;
+run;
+
+*Average target amount is 5702.18. This will be used as expected target amount;
+
+Data pred;
+	set pred;
+	avg_target_amt=5702.18;
+	run;quit;
+
+*Adding an expected value field to training data set;
+Data pred;
+	set pred;
+	expected_ins_amt=round(phat*avg_target_amt,.01);
+	run;quit;
+
+*Viewing test data set;
+proc contents data=logdata.logit_insurance_test;
+run; quit;
+*2141 records to keep track of in test data;
+
+Data need_predictions;
+	set logdata.logit_insurance_test;
+	IMP_Age=Age;
+   M_Age=0;
+   if missing (Age) then do;
+   IMP_Age=44.8;
+   M_Age=1;
+   end;
+   drop Age;
+
+   IMP_Car_Age=Car_Age;
+   M_Car_Age=0;
+   if missing (Car_Age) then do;
+   IMP_Car_Age=8.3;
+   M_Car_Age=1;
+   end;
+   drop Car_Age;
+
+   IMP_Home_Val=Home_Val;
+   M_Home_Val=0;
+   if missing (Home_Val) then do;
+   IMP_Home_Val=154867.3;
+   M_Home_Val=1;
+   end;
+   drop Home_Val;
+
+   IMP_Income=Income;
+   M_Income=0;
+   if missing (Income) then do;
+   IMP_Income=61898;
+   M_Income=1;
+   end;
+   drop Income;
+
+   IMP_YOJ=YOJ;
+   M_YOJ=0;
+   if missing (YOJ) then do;
+   IMP_YOJ=10.5;
+   M_YOJ=1;
+   end;
+   drop YOJ;
+
+   if job = "." or job = " " then job = "z_Blue Collar";
+
+   	CLM_MVR=CLM_FREQ*MVR_PTS;
+   	if (EDUCATION='Masters') or (EDUCATION='PhD') or (EDUCATION='Bachelors') then Bachelors_degree=1;
+	else Bachelors_degree=0;
+	drop education;
+run; quit;
+
+proc means data= need_predictions noprint;
+output out =MEANFILE2
+	p1(IMP_Age IMP_Car_Age BLUEBOOK clm_freq IMP_Home_VAL IMP_Income OLDCLAIM)=p01AGE p01CAGE p01B p01cf p01HV p01I p01O
+	p5(IMP_AGE IMP_Car_Age BLUEBOOK clm_freq IMP_HOME_VAL IMP_Income OLDCLAIM)=p05AGE p05CAGE p05B p05cf p05HV p05I p05O
+	p95(IMP_AGE IMP_Car_Age BLUEBOOK clm_freq IMP_HOME_VAL IMP_Income OLDCLAIM)=p95AGE p95CAGE p95B p95cf p95HV p95I p95O
+	p99(IMP_AGE IMP_Car_Age BLUEBOOK clm_freq IMP_HOME_VAL IMP_Income OLDCLAIM)=p99AGE p99CAGE p99B p99cf p99HV p99I p99O;
+proc print data=MEANFILE2;
+run;
+
+data;
+set MEANFILE2;
+call symput("P01AGE",P01AGE);
+call symput("P05AGE",P05AGE);
+call symput("p95AGE",P95AGE);
+call symput("p99AGE",P99AGE);
+call symput("P01CAGE",P01CAGE);
+call symput("P05CAGE",P05CAGE);
+call symput("p95CAGE",P95CAGE);
+call symput("p99CAGE",P99CAGE);
+call symput("P01B",P01B);
+call symput("P05B",P05B);
+call symput("p95B",P95B);
+call symput("p99B",P99B);
+call symput("P01cf",P01cf);
+call symput("P05cf",P05cf);
+call symput("p95cf",P95cf);
+call symput("p99cf",P99cf);
+call symput("P01hv",P01hv);
+call symput("P05hv",P05hv);
+call symput("p95hv",P95hv);
+call symput("p99hv",P99hv);
+call symput("P01I",P01I);
+call symput("P05I",P05I);
+call symput("p95I",P95I);
+call symput("p99I",P99I);
+call symput("P01O",P01O);
+call symput("P05O",P05O);
+call symput("p95O",P95O);
+call symput("p99O",P99O);
+run; quit;
+
+data xform2;
+set need_predictions;
+T95_AGE	=max(min(IMP_AGE,&P95AGE.),&p05AGE.);
+T99_AGE	=max(min(IMP_AGE,&P99AGE.),&p01AGE.);
+T95_CAGE	=max(min(IMP_CAR_AGE,&P95CAGE.),&p05CAGE.);
+T99_CAGE	=max(min(IMP_CAR_AGE,&P99CAGE.),&p01CAGE.);
+T95_B	=max(min(BLUEBOOK,&P95B.),&p05B.);
+T99_B	=max(min(BLUEBOOK,&P99B.),&p01B.);
+T95_cf	=max(min(clm_freq,&P95cf.),&p05cf.);
+T99_cf	=max(min(clm_freq,&P99cf.),&p01cf.);
+T95_hv	=max(min(IMP_HOME_VAL,&P95hv.),&p05hv.);
+T99_hv	=max(min(IMP_HOME_VAL,&P99hv.),&p01hv.);
+T95_I	=max(min(IMP_Income,&P95I.),&p05I.);
+T99_I	=max(min(IMP_Income,&P99I.),&p01I.);
+T95_O	=max(min(OLDCLAIM,&P95O.),&p05O.);
+T99_O	=max(min(OLDCLAIM,&P99O.),&p01O.);
+run;quit;
+
+proc print data=xform2 (obs=5);
+run;quit;
+
+*Making sure no records are missing;
+proc means data=xform2 nmiss;
+run;
+proc freq data=xform2;
+tables PARENT1 MSTATUS SEX JOB CAR_USE CAR_TYPE RED_CAR REVOKED URBANICITY Bachelors_degree/missing;
+run;quit;
+
+*Scoring test data model;
+proc logistic inmodel=insmodel;
+   score data=xform2 out=testscore;
+run;
+
+data LogData.Gould_ins_prob;
+   set testscore;
+   p_target_flag= p_1;
+   keep index p_target_flag;
+run; quit;
+
+data LogData.Gould_ins_amt;
+   set testscore;
+   p_target_amt = 5702.18;
+   keep index p_target_amt;
+run;
+
+*///add p_target_amt in file named LogData.Gould_ins_amt///;
+*///merge the two files using index as the by variable///;
+
+data LogData.Gould_ins;
+merge LogData.Gould_ins_prob(in=ina) LogData.Gould_ins_amt(in=inb);
+by INDEX;
+if ina;
+run; quit;
+
+*Lift Chart;
+proc rank data=pred out=training_scores descending groups=10;
+var phat;
+ranks score_decile;
+run;
+
+proc means data=training_scores sum;
+class score_decile;
+var target_flag;
+output out=pm_out sum(target_flag)=Y_Sum;
+run;
+
+proc print data=pm_out; run;
+
+data lift_chart;
+	set pm_out (where=(_type_=1));
+	by _type_;
+	Nobs=_freq_;
+	score_decile = score_decile+1;
+
+	if first._type_ then do;
+		cum_obs=Nobs;
+		model_pred=Y_Sum;
+	end;
+	else do;
+		cum_obs=cum_obs+Nobs;
+		model_pred=model_pred+Y_Sum;
+	end;
+	retain cum_obs model_pred;
+
+	* 2148 represents the number of successes;
+	* This value will need to be changed with different samples;
+	pred_rate=model_pred/2148;
+	base_rate=score_decile*0.1;
+	lift = pred_rate-base_rate;
+
+	drop _freq_ _type_ ;
+run;
+
+proc print data=lift_chart; run;
+
+ods graphics on;
+title 'Your Lift Chart';
+symbol1 color=red interpol=join value=dot height=1;
+symbol2 color=black interpol=join value=dot height=1;
+proc gplot data=lift_chart;
+plot pred_rate*base_rate base_rate*base_rate /overlay ;
+run; quit;
+ods graphics off;
+
+*KS statistic is the max value in the lift chart.  It is .34721;
